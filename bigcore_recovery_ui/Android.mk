@@ -5,9 +5,9 @@ LOCAL_SRC_FILES := bigcore_recovery_ui.cpp
 LOCAL_MODULE_TAGS := optional
 LOCAL_C_INCLUDES := bootable/recovery
 LOCAL_MODULE := libbigcore_recovery_ui
-ifeq ($(RECOVERY_MIN_BATT_CAP),)
-RECOVERY_MIN_BATT_CAP := 0
+LOCAL_CFLAGS := -Wall -Wno-unused-parameter -Werror
+ifeq ($(RECOVERY_HAVE_SD_CARD),true)
+LOCAL_CFLAGS += -DHAVE_SD_CARD=1
 endif
-LOCAL_CFLAGS := -Wall -DMIN_BATTERY_LEVEL=$(RECOVERY_MIN_BATT_CAP)
 include $(BUILD_STATIC_LIBRARY)
 

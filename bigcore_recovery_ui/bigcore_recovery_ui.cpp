@@ -29,16 +29,27 @@ static const char* ITEMS[] =  {"reboot system now",
                                "apply update from ADB",
                                "wipe data/factory reset",
                                "wipe cache partition",
+                               "select update package from /cache",
+#if HAVE_SD_CARD
+                               "select update package from SD Card",
+#endif
                                NULL };
 
 class DefaultUI : public ScreenRecoveryUI {
   public:
     virtual KeyAction CheckKey(int key) {
-        if (((key == KEY_VOLUMEUP) && IsKeyPressed(KEY_VOLUMEDOWN))
-                || ((key == KEY_VOLUMEDOWN) && IsKeyPressed(KEY_VOLUMEUP))) {
-            return TOGGLE;
-        } else if (((key == KEY_UP) && IsKeyPressed(KEY_DOWN))
-                || ((key == KEY_DOWN) && IsKeyPressed(KEY_UP))) {
+        switch (key) {
+        case KEY_VOLUMEUP:
+        case KEY_UP:
+            if (IsKeyPressed(KEY_VOLUMEDOWN) || IsKeyPressed(KEY_VOLUMEUP))
+                return TOGGLE;
+            break;
+        case KEY_VOLUMEDOWN:
+        case KEY_DOWN:
+            if (IsKeyPressed(KEY_VOLUMEUP) || IsKeyPressed(KEY_UP))
+                return TOGGLE;
+            break;
+        case KEY_ESC:
             return TOGGLE;
         }
         return ENQUEUE;
@@ -79,6 +90,10 @@ class DefaultDevice : public Device {
           case 1: return APPLY_ADB_SIDELOAD;
           case 2: return WIPE_DATA;
           case 3: return WIPE_CACHE;
+          case 4: return APPLY_CACHE;
+#if HAVE_SD_CARD
+          case 5: return APPLY_EXT;
+#endif
           default: return NO_ACTION;
         }
     }
