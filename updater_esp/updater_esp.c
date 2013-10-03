@@ -30,86 +30,9 @@
 
 #include <edify/expr.h>
 #include <gpt/gpt.h>
-
+#include <common_recovery.h>
 
 #define CHUNK 1024*1024
-
-static ssize_t robust_read(int fd, void *buf, size_t count)
-{
-    unsigned char *pos = buf;
-    ssize_t ret;
-    ssize_t total = 0;
-    do {
-        ret = read(fd, pos, count);
-        if (ret < 0) {
-            if (errno != EINTR)
-                return -1;
-            else
-                continue;
-        }
-        count -= ret;
-        pos += ret;
-        total += ret;
-    } while (count && ret);
-
-    return total;
-}
-
-
-static ssize_t robust_write(int fd, const void *buf, size_t count)
-{
-    const char *pos = buf;
-    ssize_t total_written = 0;
-    ssize_t written;
-
-    /* Short write due to insufficient space OK;
-     * partitions may not be exactly the same size
-     * but underlying fs should be min of both sizes */
-    do {
-        written = write(fd, pos, count);
-        if (written < 0) {
-            if (errno != EINTR)
-                return -1;
-            else
-                continue;
-        }
-        count -= written;
-        pos += written;
-        total_written += written;
-    } while (count && written);
-
-    return total_written;
-}
-
-
-static int sysfs_read_int(int *ret, char *fmt, ...)
-{
-    char path[PATH_MAX];
-    va_list ap;
-    char buf[4096];
-    int fd;
-    ssize_t bytes_read;
-    int rv = -1;
-
-    va_start(ap, fmt);
-    vsnprintf(path, sizeof(path), fmt, ap);
-    va_end(ap);
-
-    fd = open(path, O_RDONLY);
-    if (fd < 0)
-        return -1;
-
-    bytes_read = robust_read(fd, buf, sizeof(buf) - 1);
-    if (bytes_read < 0)
-        goto out;
-
-    buf[bytes_read] = '\0';
-    *ret = atoi(buf);
-    rv = 0;
-out:
-    close(fd);
-    return rv;
-}
 
 
 static Value *CopyPartFn(const char *name, State *state, int argc __attribute__((unused)),
@@ -119,8 +42,7 @@ static Value *CopyPartFn(const char *name, State *state, int argc __attribute__(
     char *dest = NULL;
     int srcfd = -1;
     int destfd = -1;
-    char *buf = NULL;
-    Value *ret = NULL;
+    int result = -1;
 
     if (ReadArgs(state, argv, 2, &src, &dest))
         return NULL;
@@ -143,52 +65,27 @@ static Value *CopyPartFn(const char *name, State *state, int argc __attribute__(
         goto done;
     }
 
-    buf = malloc(CHUNK);
-    if (!buf) {
-        ErrorAbort(state, "%s: memory allocation error", name);
+    if (read_write(srcfd, destfd)) {
+        ErrorAbort(state, "%s: failed to write to: %s",
+                name, dest);
         goto done;
     }
 
-    while (1) {
-        ssize_t to_write, written;
+    result = 0;
 
-        to_write = robust_read(srcfd, buf, CHUNK);
-        if (to_write < 0) {
-            ErrorAbort(state, "%s: failed to read source data: %s",
-                    name, strerror(errno));
-            goto done;
-        }
-        if (!to_write)
-            break;
-
-        written = robust_write(destfd, buf, to_write);
-        if (written < 0) {
-            ErrorAbort(state, "%s: failed to write data: %s",
-                    name, strerror(errno));
-            goto done;
-        }
-        if (!written)
-            break;
-    }
-    if (close(destfd) < 0) {
-        ErrorAbort(state, "%s: failed to close destination device: %s",
-                name, strerror(errno));
-        destfd = -1;
-        goto done;
-    }
-    destfd = -1;
-
-    ret = StringValue(strdup(""));
 done:
     if (srcfd >= 0)
         close(srcfd);
-    if (destfd >= 0)
-        close(destfd);
-    free(buf);
+    if (destfd >= 0 && close(destfd) < 0) {
+        ErrorAbort(state, "%s: failed to close destination device: %s",
+                name, strerror(errno));
+        result = -1;
+    }
     free(src);
     free(dest);
-    return ret;
+    return (result ? NULL : StringValue(strdup("")));
 }
+
 
 
 static struct gpt_entry *find_android_partition(struct gpt *gpt, const char *name)
@@ -203,7 +100,7 @@ static struct gpt_entry *find_android_partition(struct gpt *gpt, const char *nam
             return NULL;
 
         /* Skip over the 'install id' */
-        ret = strcmp(pname + 16, name);
+        ret = strcmp(pname, name);
         free(pname);
         if (!ret)
             return e;
@@ -340,7 +237,7 @@ done:
 }
 
 
-void Register_libbigcore_updater(void)
+void Register_libupdater_esp(void)
 {
     RegisterFunction("swap_entries", SwapEntriesFn);
     RegisterFunction("copy_partition", CopyPartFn);
