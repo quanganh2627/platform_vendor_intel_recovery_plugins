@@ -10,6 +10,9 @@ $(UFB_ESP_UPDATE_BLOB): \
 			--output $@ \
 			$(UFB_ESP_UPDATE_FILES)
 
+.PHONY: ufp_esp
+ufp_esp: $(UFP_ESP_UPDATE_BLOB)
+
 droidcore: $(UFB_ESP_UPDATE_BLOB)
 $(call dist-for-goals,droidcore,$(UFB_ESP_UPDATE_BLOB):$(TARGET_PRODUCT)-ufb_esp_update-$(FILE_NAME_TAG).bin)
 
