@@ -8,6 +8,6 @@ LOCAL_C_INCLUDES := bootable/recovery \
 		    $(LOCAL_PATH)/../common_recovery
 
 LOCAL_MODULE := libupdater_esp
-LOCAL_CFLAGS := -Wall -Werror
+LOCAL_CFLAGS := -Wall -Werror -DKERNEL_ARCH=\"$(TARGET_KERNEL_ARCH)\"
 include $(BUILD_STATIC_LIBRARY)
 

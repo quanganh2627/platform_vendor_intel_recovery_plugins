@@ -236,10 +236,28 @@ done:
     return ret;
 }
 
+static Value *CopyShimFn(const char *name, State *state,
+        int argc __attribute__((unused)), Expr *argv[] __attribute__((unused)))
+{
+    char path[PATH_MAX];
+
+    /* If these fail directory probably already exists; we'll catch it
+     * in copy_file() at any rate */
+    mkdir("/bootloader/EFI", 0777);
+    mkdir("/bootloader/EFI/Boot", 0777);
+    snprintf(path, PATH_MAX - 1, "/bootloader/EFI/Boot/%s",
+            strcmp(KERNEL_ARCH, "x86_64") ? "bootia32.efi" : "bootx64.efi");
+    if (copy_file("/bootloader/shim.efi", path)) {
+        ErrorAbort(state, "%s: couldn't update %s", name, path);
+        return NULL;
+    }
+    return StringValue(strdup(""));
+}
 
 void Register_libupdater_esp(void)
 {
     RegisterFunction("swap_entries", SwapEntriesFn);
     RegisterFunction("copy_partition", CopyPartFn);
+    RegisterFunction("copy_shim", CopyShimFn);
 }
 
