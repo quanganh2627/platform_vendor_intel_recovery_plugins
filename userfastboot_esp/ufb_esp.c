@@ -3,6 +3,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <sys/mount.h>
+#include <sys/mman.h>
 #include <errno.h>
 
 #include <userfastboot_util.h>
@@ -28,28 +29,13 @@ static int rdline(char *ptr)
 	return cnt + 1;
 }
 
-static int update_droid(Hashmap *params, void *data, unsigned sz)
+static int update_droid(Hashmap *params, int *fd, unsigned sz)
 {
 	int cnt, i, ret = -1;
-	char *ptr = data;
+	char *ptr = NULL, *ptr_orig = NULL;
 	const char *bootptn;
 	char buf[PATH_MAX];
 	struct fstab_rec *vol;
-
-	/* read in file count */
-	i = rdline(ptr);
-	cnt = strtol(ptr, NULL, 10);
-	if (cnt < 1) {
-		pr_error("bad blob format");
-		return -1;
-	}
-	ptr += i;
-
-	pr_debug("dbupdate:  base: %p size: %d cnt: %d\n",  data, sz, cnt);
-	if (cnt >= MAXFILS) {
-		pr_error("Too many files");
-		return -1;
-	}
 
 	vol = volume_for_name(BOOT_PART);
 	if (!vol) {
@@ -59,9 +45,29 @@ static int update_droid(Hashmap *params, void *data, unsigned sz)
 	}
 	bootptn = vol->blk_device;
 
+	ptr = ptr_orig = mmap64(NULL, sz, PROT_READ, MAP_SHARED, *fd, 0);
+	if (ptr == (void*)- 1) {
+		pr_error("dbupdate: failed to mmap the file\n");
+		goto out_fail;
+	}
+
+	/* read in file count */
+	i = rdline(ptr);
+	cnt = strtol(ptr, NULL, 10);
+	if (cnt < 1) {
+		pr_error("bad blob format");
+		goto out_munmap;
+	}
+	ptr += i;
+
+	if (cnt >= MAXFILS) {
+		pr_error("Too many files");
+		goto out_munmap;
+	}
+
 	if (mount_partition_device(bootptn, vol->fs_type, "/boot")) {
 		pr_error("Couldn't mount bootloader partition.\n");
-		return -1;
+		goto out_munmap;
 	}
 
 	for (i = 0; i < cnt; i++) {
@@ -96,8 +102,11 @@ static int update_droid(Hashmap *params, void *data, unsigned sz)
 	}
 	ret = 0;
 
+out_munmap:
+	munmap(ptr_orig, sz);
 out_fail:
 	umount(bootptn);
+
 	return ret;
 }
 
