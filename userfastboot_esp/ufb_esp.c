@@ -108,7 +108,7 @@ static int update_droid(Hashmap *params, int *fd, unsigned sz)
 	}
 	bootptn = vol->blk_device;
 
-	ptr = ptr_orig = mmap64(NULL, sz, PROT_READ, MAP_SHARED, *fd, 0);
+	ptr = ptr_orig = mmap64(NULL, sz, PROT_READ | PROT_WRITE, MAP_SHARED, *fd, 0);
 	if (ptr == (void*)- 1) {
 		pr_error("dbupdate: failed to mmap the file\n");
 		goto out_fail;
