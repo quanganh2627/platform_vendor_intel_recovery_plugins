@@ -69,7 +69,7 @@ static int cmd_flash_capsule_update(Hashmap *params, int *fd, unsigned sz)
 	miscVol = volume_for_path("/misc");
 	strncpy(msg.command, BOOTLOADER_CAPSULE_TEST_BCB, sizeof(msg.command));
 
-	if (named_file_write(miscVol->blk_device, (const unsigned char*) &msg, sizeof(msg), 0, 0)) {
+	if (miscVol && named_file_write(miscVol->blk_device, (const unsigned char*) &msg, sizeof(msg), 0, 0)) {
 		pr_error("Failed to write bootloader message\n");
 		goto err;
 	}
