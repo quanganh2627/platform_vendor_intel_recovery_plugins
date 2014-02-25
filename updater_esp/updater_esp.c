@@ -375,7 +375,7 @@ static Value *CopyShimFn(const char *name, State *state,
     mkdir("/bootloader/EFI", 0777);
     mkdir("/bootloader/EFI/Boot", 0777);
     snprintf(path, PATH_MAX - 1, "/bootloader/EFI/Boot/%s",
-            strcmp(KERNEL_ARCH, "x86_64") ? "bootia32.efi" : "bootx64.efi");
+            strcmp(UEFI_ARCH, "i386") ? "bootx64.efi" : "bootia32.efi");
     if (copy_file("/bootloader/shim.efi", path)) {
         ErrorAbort(state, "%s: couldn't update %s", name, path);
         return NULL;
